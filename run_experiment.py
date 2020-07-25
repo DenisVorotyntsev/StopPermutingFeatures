@@ -83,14 +83,11 @@ def run_experiment(experiment_params: Dict[str, any]) -> Dict[str, float]:
     experiment_results["permutation_ranks_corr"] = permutation_ranks_corr
 
     # shap
-    explainer = shap.TreeExplainer(
-        model,
-        data_combined.sample(experiment_params["shap_data_sample"], random_state=experiment_params["seed"])
-    )
+    explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(data_combined)[1]  # class 1 SHAP values
     shap_values = abs(shap_values)
-    shap_fe = -shap_values
-    shap_ranks_corr = spearmanr(expected_ranks, shap_fe)[0]
+    shap_fe = shap_values.sum(axis=0)
+    shap_ranks_corr = spearmanr(expected_ranks, -shap_fe)[0]
     experiment_results["shap_ranks_corr"] = shap_ranks_corr
 
     # gain
@@ -148,4 +145,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main(num_seeds=1, results_save_path="./data/experiment_results.csv")
+    main(num_seeds=5, results_save_path="./data/experiment_results.csv")

@@ -137,3 +137,23 @@ def generate_normal_target(
 
     return y
 
+
+def generate_normal_target_functions(
+        data: np.array,
+        task: str = "classification"
+) -> np.array:
+    n_samples, n_features = data.shape
+
+    functions_to_select_from = {
+        "linear": lambda x: x,
+        "**2": lambda x: x**2,
+        "**3": lambda x: x**3,
+        "exp": lambda x: np.exp(x),
+        ">0": lambda x: float(x > 0.5),
+        "sigmoid": lambda x: expit(x)
+    }
+    functions_to_select_from = list(functions_to_select_from.items())
+
+    # TODO: check how correlations affect ICI plots
+    pass
+
