@@ -6,16 +6,16 @@ import numpy as np
 from tqdm import tqdm
 from scipy.stats import spearmanr
 
+import shap
 from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import roc_auc_score
 from lightgbm import LGBMClassifier
-import shap
+from sklearn.preprocessing import StandardScaler
 
 from src.generate_data import (
     generate_weights_gamma,
     get_correlated_data_stats,
     generate_normal_correlated_data,
-    generate_normal_data,
     generate_normal_target
 )
 from src.calculate_importance import calculate_permutation_importance
@@ -25,37 +25,23 @@ from src.utils import rank_array
 def run_experiment(experiment_params: Dict[str, any]) -> Dict[str, float]:
     experiment_results = collections.OrderedDict()
 
-    # generate correlated data
-    data_correlated = generate_normal_correlated_data(
+    # generate data
+    data = generate_normal_correlated_data(
         mu=experiment_params["mu"],
         var=experiment_params["var"],
-        n_features=experiment_params["n_features_corr"],
+        n_features=experiment_params["n_features"],
         n_samples=experiment_params["n_samples"],
         noise_magnitude_loc=experiment_params["noise_magnitude_loc"],
         noise_magnitude_scale=experiment_params["noise_magnitude_scale"],
         seed=experiment_params["seed"]
     )
-    corr_data_stats = get_correlated_data_stats(data_correlated)
-    for key, value in corr_data_stats.items():
+    data_stats = get_correlated_data_stats(data)
+    for key, value in data_stats.items():
         experiment_results[f"corr_data_{key}"] = value
-
-    # generate non-correlated data
-    normal_data = generate_normal_data(
-        mu=experiment_params["mu"],
-        var=experiment_params["var"],
-        n_features=experiment_params["n_features_no_corr"],
-        n_samples=experiment_params["n_samples"],
-
-        # ensure seeds don't repeat between correlated and uncorrelated generations
-        seed=experiment_params["seed"] + 1_000_001,
-    )
-
-    # combine together correlated and non-correlated data
-    data_combined = np.hstack([data_correlated, normal_data])
 
     # generate weights of features
     weights = generate_weights_gamma(
-        n_features=data_combined.shape[1],
+        n_features=data.shape[1],
         gamma=experiment_params["gamma"],
         scale=experiment_params["scale"],
         weights_range=experiment_params["weights_range"],
@@ -65,16 +51,16 @@ def run_experiment(experiment_params: Dict[str, any]) -> Dict[str, float]:
 
     # generate target
     y = generate_normal_target(
-        data_combined,
+        data,
         weights,
         task=experiment_params["task"]
     )
-    data_combined = pd.DataFrame(data_combined)
+    data = pd.DataFrame(data)
 
     # permutation importance
     model, score, importances, importance_ranks = calculate_permutation_importance(
         LGBMClassifier(**experiment_params["model_params"]),
-        data_combined, y,
+        data, y,
         scoring_function=roc_auc_score,
         n_repeats=experiment_params["n_repeats_permutations"],
     )
@@ -83,8 +69,8 @@ def run_experiment(experiment_params: Dict[str, any]) -> Dict[str, float]:
     experiment_results["permutation_ranks_corr"] = permutation_ranks_corr
 
     # shap
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(data_combined)[1]  # class 1 SHAP values
+    explainer = shap.TreeExplainer(model, feature_perturbation='tree_path_dependent')
+    shap_values = explainer.shap_values(data)[1]  # class 1 SHAP values
     shap_values = abs(shap_values)
     shap_fe = shap_values.sum(axis=0)
     shap_ranks_corr = spearmanr(expected_ranks, -shap_fe)[0]
@@ -109,8 +95,7 @@ def main(
             # constant params - data generation
             "mu": [1],
             "var": [1],
-            "n_features_corr": [35],
-            "n_features_no_corr": [15],
+            "n_features": [50],
             "n_samples": [10000],
 
             # constant params - weights

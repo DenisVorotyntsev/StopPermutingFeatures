@@ -3,7 +3,7 @@ from typing import Tuple, Dict
 import random
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from scipy.special import expit
 
 
@@ -89,6 +89,7 @@ def generate_normal_correlated_data(
     for ind, noise_magniture in enumerate(noise_magnitudes):
         np.random.seed(seed + 1 + ind)
         x[:, ind] = x[:, ind] + np.random.random(n_samples) * noise_magniture
+    x = StandardScaler().fit_transform(x)
     return x
 
 
@@ -105,6 +106,7 @@ def generate_normal_data(
         x_ = np.random.normal(mu, var, n_samples).reshape(-1, 1)
         x.append(x_)
     x = np.hstack(x)
+    x = StandardScaler().fit_transform(x)
     return x
 
 
@@ -129,7 +131,7 @@ def generate_normal_target(
             y = y - x * weight
 
     # min max scale into pre-defined range to avoid sigmoid+round problems
-    y = MinMaxScaler(feature_range=(-3, 3)).fit_transform(y.reshape(-1, 1))[:, 0]
+    y = StandardScaler().fit_transform(y.reshape(-1, 1))[:, 0]
 
     if task == "classification":
         y = expit(y)   # sigmoid
