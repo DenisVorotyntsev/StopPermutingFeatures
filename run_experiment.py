@@ -9,8 +9,7 @@ from scipy.stats import spearmanr
 import shap
 from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import roc_auc_score
-from lightgbm import LGBMClassifier
-from sklearn.preprocessing import StandardScaler
+from lightgbm import LGBMModel
 
 from src.generate_data import (
     generate_weights_gamma,
@@ -19,10 +18,13 @@ from src.generate_data import (
     generate_normal_target
 )
 from src.calculate_importance import calculate_permutation_importance
+from src.metrics import negative_mean_squared_error
 from src.utils import rank_array
 
 
-def run_experiment(experiment_params: Dict[str, any]) -> Dict[str, float]:
+def run_experiment(
+        experiment_params: Dict[str, any]
+) -> Dict[str, float]:
     experiment_results = collections.OrderedDict()
 
     # generate data
@@ -58,19 +60,21 @@ def run_experiment(experiment_params: Dict[str, any]) -> Dict[str, float]:
     data = pd.DataFrame(data)
 
     # permutation importance
-    model, score, importances, importance_ranks = calculate_permutation_importance(
-        LGBMClassifier(**experiment_params["model_params"]),
+    model, score, importances, importances_ranks = calculate_permutation_importance(
+        LGBMModel(**experiment_params["model_params"]),
         data, y,
-        scoring_function=roc_auc_score,
+        scoring_function=experiment_params["metric"],
         n_repeats=experiment_params["n_repeats_permutations"],
     )
-    permutation_ranks_corr = spearmanr(expected_ranks, importance_ranks)[0]
+    permutation_ranks_corr = spearmanr(expected_ranks, importances_ranks)[0]
     experiment_results["model_roc_auc"] = score
     experiment_results["permutation_ranks_corr"] = permutation_ranks_corr
 
     # shap
-    explainer = shap.TreeExplainer(model, feature_perturbation='tree_path_dependent')
-    shap_values = explainer.shap_values(data)[1]  # class 1 SHAP values
+    explainer = shap.TreeExplainer(model.booster_)
+    shap_values = explainer.shap_values(data)
+    if len(shap_values) == 2:  # 2 - list of 2 elements for classification, select class 1
+        shap_values = shap_values[1]
     shap_values = abs(shap_values)
     shap_fe = shap_values.sum(axis=0)
     shap_ranks_corr = spearmanr(expected_ranks, -shap_fe)[0]
@@ -95,20 +99,25 @@ def main(
             # constant params - data generation
             "mu": [1],
             "var": [1],
-            "n_features": [50],
-            "n_samples": [10000],
+            "n_features": [10],
+            "n_samples": [10_000],
 
             # constant params - weights
             "gamma": [1],
             "scale": [1],
             "weights_range": [(0.2, 1)],
 
-            # importance params
+            # permutation params
+            "metric": [roc_auc_score],  # "negative_mean_squared_error" for regression, "roc_auc_score" for classification
             "model_params": [
-                {"learning_rate": 0.01, "n_estimators": 100, "random_state": 42}
+                {
+                    "objective": "binary",  # "regression" for regression, "binary" for classification
+                    "learning_rate": 0.01,
+                    "n_estimators": 100,
+                    "random_state": 42
+                }
             ],
             "n_repeats_permutations": [5],
-            "shap_data_sample": [100],
 
             # changeable params
             "seed": list(range(num_seeds)),

@@ -18,7 +18,7 @@ def calculate_permutation_importance(
 ) -> Tuple[any, float, Dict[str, float], np.array]:
     """
     Example of permutation importance calculation (regression).
-    :param model: sklearn model, or any model with `fit` and `predict_proba` methods
+    :param model: sklearn model, or any model with `fit` and `predict` methods
     :param X: input features
     :param y: input target
     :param scoring_function: function to use for scoring, should output single float value
@@ -30,7 +30,7 @@ def calculate_permutation_importance(
     model.fit(X, y)
 
     # step 2 - make predictions for train data and score (higher score - better)
-    y_hat_no_shuffle = model.predict_proba(X)[:, 1]
+    y_hat_no_shuffle = model.predict(X)
     score = scoring_function(*(y, y_hat_no_shuffle))
 
     # step 3 - calculate permutation importance
@@ -47,7 +47,7 @@ def calculate_permutation_importance(
             X_temp[col] = X[col].sample(X.shape[0], replace=True, random_state=seed+n).values
 
             # make prediction for shuffled dataset
-            y_hat = model.predict_proba(X_temp)[:, 1]
+            y_hat = model.predict(X_temp)
 
             # calculate score
             score_permuted = scoring_function(*(y, y_hat))

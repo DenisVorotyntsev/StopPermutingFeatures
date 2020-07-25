@@ -16,6 +16,7 @@ def generate_weights_gamma(
 ) -> np.array:
     np.random.seed(seed)
     weights = np.random.gamma(gamma, scale, size=n_features)
+    weights = weights / np.sum(weights)
     weights = MinMaxScaler(feature_range=weights_range).fit_transform(weights.reshape(-1, 1))[:, 0]
     return weights
 
