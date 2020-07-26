@@ -11,13 +11,11 @@ def generate_weights_gamma(
     gamma: float = 1,
     scale: float = 1,
     n_features: int = 20,
-    weights_range: Tuple[float, float] = (0.2, 1),
     seed: int = 42
 ) -> np.array:
     np.random.seed(seed)
     weights = np.random.gamma(gamma, scale, size=n_features)
     weights = weights / np.sum(weights)
-    weights = MinMaxScaler(feature_range=weights_range).fit_transform(weights.reshape(-1, 1))[:, 0]
     return weights
 
 
@@ -33,7 +31,7 @@ def generate_weights_uniform(
         w = random.randint(min_, max_)
         weights.append(w)
     weights = np.array(weights)
-    weights = MinMaxScaler(feature_range=weights_range).fit_transform(weights.reshape(-1, 1))[:, 0]
+    weights = weights / np.sum(weights)
     return weights
 
 
@@ -74,11 +72,11 @@ def generate_normal_correlated_data(
         var: float = 1,
         n_features: int = 20,
         n_samples: int = 2000,
-        noise_magnitude_loc: float = 3,
-        noise_magnitude_scale: float = 1,
+        max_correlation: float = 0.99,
+        noise_magnitude_max: float = 3,
         seed: int = 42
 ) -> np.array:
-    r = np.ones((n_features, n_features)) * 0.99 * var ** 2
+    r = np.ones((n_features, n_features)) * max_correlation * var ** 2
     for i in range(n_features):
         r[i, i] = var
 
@@ -86,10 +84,11 @@ def generate_normal_correlated_data(
     x = np.random.multivariate_normal([mu] * n_features, r, size=n_samples)
 
     np.random.seed(seed + 1)
-    noise_magnitudes = np.random.normal(noise_magnitude_loc, noise_magnitude_scale, n_features)
+    noise_magnitudes = np.random.random(n_features) * noise_magnitude_max
     for ind, noise_magniture in enumerate(noise_magnitudes):
         np.random.seed(seed + 1 + ind)
-        x[:, ind] = x[:, ind] + np.random.random(n_samples) * noise_magniture
+        noise = (np.random.random(n_samples) - 0.5) * noise_magniture
+        x[:, ind] = x[:, ind] + noise
     x = StandardScaler().fit_transform(x)
     return x
 
@@ -135,8 +134,8 @@ def generate_normal_target(
     y = StandardScaler().fit_transform(y.reshape(-1, 1))[:, 0]
 
     if task == "classification":
-        y = expit(y)   # sigmoid
-        y = np.round(y)
+        y = expit(y)     # sigmoid
+        y = np.round(y)  # get labels
 
     return y
 

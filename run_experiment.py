@@ -1,5 +1,6 @@
 from typing import Dict
 import collections
+from multiprocessing import Pool
 
 import pandas as pd
 import numpy as np
@@ -17,7 +18,11 @@ from src.generate_data import (
     generate_normal_correlated_data,
     generate_normal_target
 )
-from src.calculate_importance import calculate_permutation_importance
+from src.calculate_importance import (
+    calculate_drop_and_relearn_importance,
+    calculate_permutation_importance,
+    calculate_permute_and_relearn_importance,
+)
 from src.metrics import negative_mean_squared_error
 from src.utils import rank_array
 
@@ -33,10 +38,12 @@ def run_experiment(
         var=experiment_params["var"],
         n_features=experiment_params["n_features"],
         n_samples=experiment_params["n_samples"],
-        noise_magnitude_loc=experiment_params["noise_magnitude_loc"],
-        noise_magnitude_scale=experiment_params["noise_magnitude_scale"],
+        max_correlation=experiment_params["max_correlation"],
+        noise_magnitude_max=experiment_params["noise_magnitude_max"],
         seed=experiment_params["seed"]
     )
+
+    # get data's correlation statistics
     data_stats = get_correlated_data_stats(data)
     for key, value in data_stats.items():
         experiment_results[f"corr_data_{key}"] = value
@@ -46,7 +53,6 @@ def run_experiment(
         n_features=data.shape[1],
         gamma=experiment_params["gamma"],
         scale=experiment_params["scale"],
-        weights_range=experiment_params["weights_range"],
         seed=experiment_params["seed"]
     )
     expected_ranks = rank_array(-weights)
@@ -71,7 +77,7 @@ def run_experiment(
     experiment_results["permutation_ranks_corr"] = permutation_ranks_corr
 
     # shap
-    explainer = shap.TreeExplainer(model.booster_)
+    explainer = shap.TreeExplainer(model.booster_, feature_perturbation="tree_path_dependent")
     shap_values = explainer.shap_values(data)
     if len(shap_values) == 2:  # 2 - list of 2 elements for classification, select class 1
         shap_values = shap_values[1]
@@ -84,10 +90,29 @@ def run_experiment(
     model_fe = model.booster_.feature_importance(importance_type='gain')
     gain_ranks_corr = spearmanr(expected_ranks, -model_fe)[0]
     experiment_results["gain_ranks_corr"] = gain_ranks_corr
+
+    # drop and relearn
+    _, _, _, importances_ranks_drop = calculate_drop_and_relearn_importance(
+        LGBMModel(**experiment_params["model_params"]),
+        data, y,
+        scoring_function=experiment_params["metric"],
+    )
+    drop_and_relearn_ranks_corr = spearmanr(expected_ranks, importances_ranks_drop)[0]
+    experiment_results["drop_and_relearn_ranks_corr"] = drop_and_relearn_ranks_corr
+
+    # permute and relearn
+    _, _, _, importances_ranks_permute = calculate_drop_and_relearn_importance(
+        LGBMModel(**experiment_params["model_params"]),
+        data, y,
+        scoring_function=experiment_params["metric"],
+    )
+    permute_and_relearn_ranks_corr = spearmanr(expected_ranks, importances_ranks_permute)[0]
+    experiment_results["permute_and_relearn_ranks_corr"] = permute_and_relearn_ranks_corr
     return experiment_results
 
 
 def main(
+        n_workers: int = 4,
         num_seeds: int = 3,
         results_save_path: str = "./data/experiment_results.csv"
 ) -> None:
@@ -97,15 +122,14 @@ def main(
             "task": ["classification"],
 
             # constant params - data generation
-            "mu": [1],
+            "mu": [0],
             "var": [1],
-            "n_features": [10],
+            "n_features": [50],
             "n_samples": [10_000],
 
             # constant params - weights
             "gamma": [1],
             "scale": [1],
-            "weights_range": [(0.2, 1)],
 
             # permutation params
             "metric": [roc_auc_score],  # "negative_mean_squared_error" for regression, "roc_auc_score" for classification
@@ -120,18 +144,17 @@ def main(
             "n_repeats_permutations": [5],
 
             # changeable params
+            "max_correlation": [0.95, 0.9, 0.8, 0.7, 0.6, 0.5],
+            "noise_magnitude_max": np.arange(1, 5, 1),
             "seed": list(range(num_seeds)),
-            "noise_magnitude_loc": np.arange(0, 11, 1),
-            "noise_magnitude_scale": np.arange(1, 3, 1),
         }
     )
     experiments_grid = list(experiments_grid)
 
     # run experiments
-    results = []
-    for experiment_params in tqdm(experiments_grid):
-        experiment_results = run_experiment(experiment_params)
-        results.append(experiment_results)
+    with Pool(processes=n_workers) as p:
+        results = tqdm(p.imap(run_experiment, experiments_grid), total=len(experiments_grid))
+        results = list(results)
 
     # save
     results = pd.DataFrame(results)
@@ -139,4 +162,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main(num_seeds=5, results_save_path="./data/experiment_results.csv")
+    main(n_workers=4, num_seeds=1, results_save_path="./data/experiment_results.csv")
