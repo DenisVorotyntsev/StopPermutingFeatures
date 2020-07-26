@@ -91,28 +91,28 @@ def run_experiment(
     gain_ranks_corr = spearmanr(expected_ranks, -model_fe)[0]
     experiment_results["gain_ranks_corr"] = gain_ranks_corr
 
-    # drop and relearn
-    _, _, _, importances_ranks_drop = calculate_drop_and_relearn_importance(
-        LGBMModel(**experiment_params["model_params"]),
-        data, y,
-        scoring_function=experiment_params["metric"],
-    )
-    drop_and_relearn_ranks_corr = spearmanr(expected_ranks, importances_ranks_drop)[0]
-    experiment_results["drop_and_relearn_ranks_corr"] = drop_and_relearn_ranks_corr
+    if experiment_params["apply_relearn"]:
+        # drop and relearn
+        _, _, _, importances_ranks_drop = calculate_drop_and_relearn_importance(
+            LGBMModel(**experiment_params["model_params"]),
+            data, y,
+            scoring_function=experiment_params["metric"],
+        )
+        drop_and_relearn_ranks_corr = spearmanr(expected_ranks, importances_ranks_drop)[0]
+        experiment_results["drop_and_relearn_ranks_corr"] = drop_and_relearn_ranks_corr
 
-    # permute and relearn
-    _, _, _, importances_ranks_permute = calculate_drop_and_relearn_importance(
-        LGBMModel(**experiment_params["model_params"]),
-        data, y,
-        scoring_function=experiment_params["metric"],
-    )
-    permute_and_relearn_ranks_corr = spearmanr(expected_ranks, importances_ranks_permute)[0]
-    experiment_results["permute_and_relearn_ranks_corr"] = permute_and_relearn_ranks_corr
+        # permute and relearn
+        _, _, _, importances_ranks_permute = calculate_permute_and_relearn_importance(
+            LGBMModel(**experiment_params["model_params"]),
+            data, y,
+            scoring_function=experiment_params["metric"],
+        )
+        permute_and_relearn_ranks_corr = spearmanr(expected_ranks, importances_ranks_permute)[0]
+        experiment_results["permute_and_relearn_ranks_corr"] = permute_and_relearn_ranks_corr
     return experiment_results
 
 
 def main(
-        n_workers: int = 4,
         num_seeds: int = 3,
         results_save_path: str = "./data/experiment_results.csv"
 ) -> None:
@@ -120,6 +120,7 @@ def main(
     experiments_grid = ParameterGrid(
         {
             "task": ["classification"],
+            "apply_relearn": [False],
 
             # constant params - data generation
             "mu": [0],
@@ -152,9 +153,9 @@ def main(
     experiments_grid = list(experiments_grid)
 
     # run experiments
-    with Pool(processes=n_workers) as p:
-        results = tqdm(p.imap(run_experiment, experiments_grid), total=len(experiments_grid))
-        results = list(results)
+    results = []
+    for grid in tqdm(experiments_grid):
+        results.append(run_experiment(grid))
 
     # save
     results = pd.DataFrame(results)
@@ -162,4 +163,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main(n_workers=4, num_seeds=1, results_save_path="./data/experiment_results.csv")
+    main(num_seeds=50, results_save_path="./data/experiment_results_no_relearn.csv")
