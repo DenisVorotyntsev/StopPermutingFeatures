@@ -1,7 +1,7 @@
-# Stop permuting features 
+# Stop Permuting Features 
 
 This repository contains code for the experiment described in my blog post on permutation importance - 
-[Stop permuting features](google.com).
+[Stop permuting features](https://towardsdatascience.com/stop-permuting-features-c1412e31b63f).
 
 ### Structure of the project 
 
@@ -19,7 +19,7 @@ This repository contains code for the experiment described in my blog post on pe
 
 ### Reproducibility of results
 
-Specify all params in `run_experiment.py` file, and run the following code: 
+Specify all parameters in `main` function (`run_experiment.py` file), and run the following code: 
 
 ```python
 pip install -r requirements.txt
