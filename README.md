@@ -1,11 +1,11 @@
 # Stop permuting features 
 
-This repository contains code for experiment described in my blog post on permutation importance - 
+This repository contains code for the experiment described in my blog post on permutation importance - 
 [Stop permuting features](google.com).
 
-Structure of the project: 
+### Structure of the project 
 
-`src` - all experiment's code 
+`src` - all the experiment's code 
 
 `notebooks`
 * `notebooks/0-experiment-illustration.ipynb` - illustration fo the single experiment 
@@ -14,5 +14,17 @@ Structure of the project:
 * `notebooks/2-extrapolation-illustration.ipynb` - notebook illustrating extrapolation problem of permutation importance
 
 `data`
-* `data/experiment_results_no_relearn.csv` - combined data from experiment without relearning (1200 runs)
-* `data/experiment_results_relearn.csv` - combined data from experiment with relearning (120 runs)
+* `data/experiment_results_no_relearn.csv` - combined data from the experiment without relearning (1200 runs)
+* `data/experiment_results_relearn.csv` - combined data from an experiment with relearning (120 runs)
+
+### Reproducibility of results
+
+Specify all params in `run_experiment.py` file, and run the following code: 
+
+```python
+pip install -r requirements.txt
+python3 run_experiment.py
+```
+
+Although it's a bad practice to make changes in code to run a new experiment, 
+the project is rather simple, so no config files were used. 
