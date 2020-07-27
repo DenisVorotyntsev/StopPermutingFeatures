@@ -1,6 +1,5 @@
 from typing import Tuple, Dict
 
-import random
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
@@ -13,29 +12,28 @@ def generate_weights_gamma(
     n_features: int = 20,
     seed: int = 42
 ) -> np.array:
+    """
+    Generate gamma-distributed weights. Sum of weights = 1.
+    :param gamma: gamma parameter of gamma distribution
+    :param scale: scale parameter of gamma distribution
+    :param n_features: number of features (i.e. lengths of weights)
+    :param seed: random state
+    :return:
+    """
     np.random.seed(seed)
     weights = np.random.gamma(gamma, scale, size=n_features)
     weights = weights / np.sum(weights)
     return weights
 
 
-def generate_weights_uniform(
-        n_features: int = 20,
-        weights_range: Tuple[float, float] = (0.2, 1),
-        seed: int = 42
-) -> np.array:
-    min_, max_ = weights_range
-    weights = []
-    for i in range(n_features):
-        random.seed(seed+i)
-        w = random.randint(min_, max_)
-        weights.append(w)
-    weights = np.array(weights)
-    weights = weights / np.sum(weights)
-    return weights
-
-
-def get_correlated_data_stats(data: np.array) -> Dict[str, float]:
+def get_correlated_data_stats(
+        data: np.array
+) -> Dict[str, float]:
+    """
+    Calculated correlation statistics of the given dataset
+    :param data: input data
+    :return:
+    """
     n_features = data.shape[1]
     corr = pd.DataFrame(data).corr()
     corr = np.array(corr)
@@ -76,6 +74,18 @@ def generate_normal_correlated_data(
         noise_magnitude_max: float = 3,
         seed: int = 42
 ) -> np.array:
+    """
+    Generate normally distributed uncorrelated data and add noise to it.
+    :param mu: mean
+    :param var: variance
+    :param n_features: number of features in generated data
+    :param n_samples: number of samples in generated data
+    :param max_correlation: max pair correlation between features
+    :param noise_magnitude_max: magnitude of noise to add to data.
+    Noise will be generated uniformly from [-0.5, 0.5] * noise_magnitude_max range
+    :param seed: random state
+    :return:
+    """
     r = np.ones((n_features, n_features)) * max_correlation * var ** 2
     for i in range(n_features):
         r[i, i] = var
@@ -100,6 +110,15 @@ def generate_normal_data(
         n_samples: int = 2000,
         seed: int = 42
 ) -> np.array:
+    """
+    Generate normally distributed uncorrelated data
+    :param mu: mean
+    :param var: variance
+    :param n_features: number of features in generated data
+    :param n_samples: number of samples in generated data
+    :param seed: random state
+    :return:
+    """
     x = []
     for i in range(n_features):
         np.random.seed(seed + i)
@@ -115,6 +134,14 @@ def generate_normal_target(
         weights: np.array,
         task: str = "classification"
 ) -> np.array:
+    """
+    Generate a target for regression or classification task.
+    Target is linear combination of data features and corresponding weights (sign selected at random).
+    :param data: input features
+    :param weights: weight of each feature
+    :param task: "classification" (output - binary labels) or "regression" (output - target within (-3,3) range)
+    :return:
+    """
     n_samples, n_features = data.shape
     assert n_features == len(weights)
 
@@ -136,7 +163,6 @@ def generate_normal_target(
     if task == "classification":
         y = expit(y)     # sigmoid
         y = np.round(y)  # get labels
-
     return y
 
 

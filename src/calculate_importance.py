@@ -13,8 +13,19 @@ def calculate_drop_and_relearn_importance(
         X: pd.DataFrame,
         y: pd.Series,
         scoring_function: Callable = sklearn.metrics.roc_auc_score,
-        seed: int = 42,
+        *args,
+        **kwargs
 ) -> Tuple[any, float, Dict[str, float], np.array]:
+    """
+    Calculate drop-and-relearn importance
+    :param model: sklearn model, or any model with `fit` and `predict` methods
+    :param X: input features
+    :param y: input target
+    :param scoring_function: function to use for scoring, should output single float value
+    :param args:
+    :param kwargs:
+    :return:
+    """
     # step 1 - train model
     model.fit(X, y)
 
@@ -63,6 +74,16 @@ def calculate_permute_and_relearn_importance(
     scoring_function: Callable = sklearn.metrics.roc_auc_score,
     seed: int = 42,
 ) -> Tuple[any, float, Dict[str, float], np.array]:
+    """
+    Calculate permute-and-relearn importance
+    :param model: sklearn model, or any model with `fit` and `predict` methods
+    :param X: input features
+    :param y: input target
+    :param scoring_function: function to use for scoring, should output single float value
+    :param args:
+    :param kwargs:
+    :return:
+    """
     # step 1 - train model
     model.fit(X, y)
 
